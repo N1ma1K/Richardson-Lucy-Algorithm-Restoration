@@ -3,16 +3,18 @@ from scipy.signal import fftconvolve
 
 
 def richardson_lucy(observed, psf, num_iteration, clip=False, record_interval=None):
-    """    Performs Richardson-Lucy deconvolution on a 2D image.
+    image = np.full.like(observed, fill_value=np.mean(observed))
+    psf_mirror = psf[::-1, ::-1]
+    history = []
 
-    Parameters:
-        observed (2D array): observed (blurred) image.
-        psf (2D array): point-spread function (normalized to sum=1).
-        num_iteration (int): number of iterations.
-        clip (bool): if True, clip negative values to zero after each iter.
-        record_interval (int): if given, return a list of estimates at these intervals.
-
-    Returns:
-        result (2D array): deconvolved image after num_iteration.
-        history (list of 2D arrays): estimates at each record step (if record_interval set).
-    """
+    for i in range(num_iteration):
+        conv = fftconvolve(image, psf, mode='same')
+        conv = np.where(conv == 0, np.finfo(float).eps, conv)
+        relative_blur = observed / conv
+        correction = fftconvolve(relative_blur, psf_mirror, mode='same')
+        image *= correction
+        if clip:
+            image = np.clip(image, 0, None)
+        if record_interval and (i+1) % record_interval == 0:
+            history.append(image.copy())
+    return (image, history) if record_interval else (image, None)
